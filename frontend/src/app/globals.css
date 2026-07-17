@@ -115,3 +115,29 @@ h1 {
   font-size: 0.8rem;
   color: #6b7280;
 }
+
+.service-detail {
+  font-size: 0.78rem;
+  color: #f87171;
+  margin-top: 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.hint {
+  margin-top: 1.5rem;
+  padding: 0.9rem 1.1rem;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 8px;
+  color: #fcd34d;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.hint code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #fde68a;
+}

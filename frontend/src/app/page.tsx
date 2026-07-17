@@ -37,9 +37,17 @@ export default function Home() {
               detail: data?.status || 'ok',
             };
           }
-          return { name: service.name, status: 'offline' as const };
+          return {
+            name: service.name,
+            status: 'offline' as const,
+            detail: `HTTP ${res.status}`,
+          };
         } catch (e) {
-          return { name: service.name, status: 'offline' as const, detail: String(e) };
+          return {
+            name: service.name,
+            status: 'offline' as const,
+            detail: e instanceof Error ? e.message : String(e),
+          };
         }
       }),
     );
@@ -61,13 +69,25 @@ export default function Home() {
 
       {services.map((svc) => (
         <div key={svc.name} className="service-card">
-          <span className="service-name">{svc.name}</span>
+          <div>
+            <div className="service-name">{svc.name}</div>
+            {svc.detail && svc.status === 'offline' && (
+              <div className="service-detail">{svc.detail}</div>
+            )}
+          </div>
           <span className={`status ${svc.status}`}>
             <span className="dot" />
             {svc.status}
           </span>
         </div>
       ))}
+
+      {services.every((s) => s.status === 'offline') && (
+        <div className="hint">
+          Tip: open this page at <code>http://localhost:8081/</code> if another
+          local web server (e.g., Laravel Herd, MAMP) is using port 80.
+        </div>
+      )}
 
       <button className="refresh-btn" onClick={checkHealth} disabled={loading}>
         {loading ? 'Checking...' : 'Refresh now'}

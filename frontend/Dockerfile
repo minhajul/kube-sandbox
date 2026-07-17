@@ -4,6 +4,8 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 
 COPY package*.json ./
+# `npm ci` is used because package-lock.json is committed — faster and reproducible.
+# Fall back to `npm install` if no lockfile is present.
 RUN npm ci
 
 # Stage 2: Build
@@ -32,7 +34,7 @@ ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy public assets
+# Copy public assets if they exist (Next.js requires this directory at runtime)
 COPY --from=builder /app/public ./public
 
 # Copy standalone Next.js output

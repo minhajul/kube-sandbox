@@ -9,14 +9,14 @@ spec:
   project: default
   source:
     # Update this to point at your actual Git repo
-    repoURL: https://github.com/your-org/kube-sandbox.git
+    repoURL: https://github.com/minhajul/kube-sandbox.git
     targetRevision: HEAD
     path: infrastructure/apps
     directory:
       # Recurse picks up auth-service.yaml, profile-service.yaml, frontend.yaml
       recurse: true
       include: '{*.yaml,*.yml}'
-      # Exclude the ingress so it is managed outside of the apps loop if desired
+      # Exclude the ingress so it is managed outside the apps loop if desired
       exclude: '{ingress.yaml}'
   destination:
     server: https://kubernetes.default.svc

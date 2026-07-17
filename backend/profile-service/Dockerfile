@@ -6,8 +6,10 @@ WORKDIR /app
 # Copy package files first to leverage layer caching
 COPY package*.json ./
 
-# Install all dependencies (including dev for build)
-RUN npm install
+# Install all dependencies (including dev deps for the build step)
+# `npm ci` is used because package-lock.json is committed — it produces a faster,
+# reproducible install. Fall back to `npm install` if no lockfile is present.
+RUN npm ci
 
 # Copy source
 COPY . .
@@ -24,7 +26,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm install --only=production && npm cache clean --force
+RUN npm ci --only=production && npm cache clean --force
 
 # Copy built artifacts from builder
 COPY --from=builder /app/dist ./dist
