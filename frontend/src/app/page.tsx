@@ -82,13 +82,6 @@ export default function Home() {
         </div>
       ))}
 
-      {services.every((s) => s.status === 'offline') && (
-        <div className="hint">
-          Tip: open this page at <code>http://localhost:8081/</code> if another
-          local web server (e.g., Laravel Herd, MAMP) is using port 80.
-        </div>
-      )}
-
       <button className="refresh-btn" onClick={checkHealth} disabled={loading}>
         {loading ? 'Checking...' : 'Refresh now'}
       </button>
