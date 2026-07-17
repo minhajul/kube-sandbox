@@ -2,28 +2,11 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: main-ingress
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx
   rules:
     - http:
         paths:
-          - path: /api/auth(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: auth-service-svc
-                port:
-                  number: 3001
-          - path: /api/profile(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: profile-service-svc
-                port:
-                  number: 3002
           - path: /
             pathType: Prefix
             backend:
