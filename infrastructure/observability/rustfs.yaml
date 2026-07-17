@@ -1,0 +1,99 @@
+# -- PersistentVolumeClaim --
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rustfs-data
+  namespace: observability
+  labels:
+    app: rustfs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# -- Deployment --
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rustfs
+  namespace: observability
+  labels:
+    app: rustfs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rustfs
+  template:
+    metadata:
+      labels:
+        app: rustfs
+    spec:
+      securityContext:
+        fsGroup: 10001
+        runAsUser: 10001
+      containers:
+        - name: rustfs
+          image: rustfs/rustfs:latest
+          command: ["rustfs"]
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - containerPort: 9000
+              name: s3-api
+            - containerPort: 9001
+              name: console
+          env:
+            - name: RUSTFS_ROOT_USER
+              value: admin
+            - name: RUSTFS_ROOT_PASSWORD
+              value: admin123456
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: rustfs-data
+---
+# -- Service --
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustfs
+  namespace: observability
+  labels:
+    app: rustfs
+spec:
+  type: ClusterIP
+  selector:
+    app: rustfs
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+      name: s3-api
+    - port: 9001
+      targetPort: 9001
+      protocol: TCP
+      name: console

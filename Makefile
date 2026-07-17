@@ -127,9 +127,11 @@ port-forward: ## Port-forward ingress to localhost:8081
 	@kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller $(INGRESS_PF_PORT):80
 
 test: ## Smoke-test public routes via the ingress
-	@echo "→ /api/auth/health"    && curl -s http://localhost:$(INGRESS_PF_PORT)/api/auth/health && echo
-	@echo "→ /api/profile/health" && curl -s http://localhost:$(INGRESS_PF_PORT)/api/profile/health && echo
-	@echo "→ / (frontend)"       && curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:$(INGRESS_PF_PORT)/
+	@PORT=80; curl -s -o /dev/null --connect-timeout 2 http://localhost/ || PORT=$(INGRESS_PF_PORT); \
+	echo "→ Using port $$PORT"; \
+	echo "→ /api/auth/health"    && curl -s http://localhost:$$PORT/api/auth/health && echo; \
+	echo "→ /api/profile/health" && curl -s http://localhost:$$PORT/api/profile/health && echo; \
+	echo "→ / (frontend)"       && curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:$$PORT/
 
 health: ## Direct health check via port-forward to each backend
 	@for pair in "auth-service-svc:3001" "profile-service-svc:3002"; do \
@@ -153,15 +155,49 @@ argo-status: ## Show ArgoCD sync/health status
 argo-ui: ## Port-forward ArgoCD UI to https://localhost:8080
 	@kubectl port-forward svc/argocd-server -n $(ARGO_NAMESPACE) 8080:443
 
-# ---- Cleanup ----------------------------------------------------------------
-.PHONY: clean nuke
+OBS_DIR         := $(INFRA_DIR)/observability
+OBS_NAMESPACE   := observability
+OBS_ARGOCD_FILE := $(INFRA_DIR)/argocd/observability-application.yaml
 
-clean: ## Delete all deployed resources
+# ---- Observability ----------------------------------------------------------
+.PHONY: deploy-obs grafana prometheus obs-status
+
+deploy-obs: ## Deploy the observability stack (Prometheus, Grafana, Loki, OTel)
+	kubectl apply -f $(OBS_DIR)/namespace.yaml
+	kubectl apply -f $(OBS_DIR)/ -n $(OBS_NAMESPACE)
+	kubectl apply -f $(OBS_ARGOCD_FILE) -n $(ARGO_NAMESPACE)
+	@echo "✓ Observability stack deployed"
+
+grafana: ## Port-forward Grafana to http://localhost:3003
+	@echo "→ Grafana on http://localhost:3003  (admin/admin)  Ctrl-C to stop"
+	@kubectl port-forward -n $(OBS_NAMESPACE) svc/grafana 3003:3000
+
+prometheus: ## Port-forward Prometheus to http://localhost:9090
+	@echo "→ Prometheus on http://localhost:9090  Ctrl-C to stop"
+	@kubectl port-forward -n $(OBS_NAMESPACE) svc/prometheus 9090:9090
+
+rustfs: ## Port-forward RustFS console to http://localhost:9001
+	@echo "→ RustFS console on http://localhost:9001  (admin/admin123456)  Ctrl-C to stop"
+	@kubectl port-forward -n $(OBS_NAMESPACE) svc/rustfs 9001:9001
+
+obs-status: ## Show observability pod status
+	@kubectl get pods -n $(OBS_NAMESPACE) -o wide
+
+# ---- Cleanup ----------------------------------------------------------------
+.PHONY: clean clean-obs nuke
+
+clean: ## Delete all deployed app resources
 	-kubectl delete -f $(INFRA_DIR)/ -n $(APP_NAMESPACE)
 	-kubectl delete -f $(ARGOCD_FILE) -n $(ARGO_NAMESPACE)
-	@echo "✓ Cleanup complete"
+	@echo "✓ App cleanup complete"
 
-nuke: clean argocd-down ingress-down ## Tear everything down — start fresh
+clean-obs: ## Delete all observability resources
+	-kubectl delete -f $(OBS_ARGOCD_FILE) -n $(ARGO_NAMESPACE)
+	-kubectl delete -f $(OBS_DIR)/ -n $(OBS_NAMESPACE)
+	-kubectl delete namespace $(OBS_NAMESPACE) --ignore-not-found
+	@echo "✓ Observability cleanup complete"
+
+nuke: clean clean-obs argocd-down ingress-down ## Tear everything down — start fresh
 
 # ---- Convenience ------------------------------------------------------------
 .PHONY: up dev
