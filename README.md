@@ -17,6 +17,10 @@ auto-instrumented for traces).
 - [Repository Layout](#repository-layout)
 - [The Makefile](#the-makefile)
 - [How the Pieces Fit Together](#how-the-pieces-fit-together)
+  - [Ingress routing](#ingress-routing)
+  - [ArgoCD sync](#argocd-sync)
+  - [Health probes](#health-probes)
+  - [Image build model](#image-build-model)
 - [Daily Workflows](#daily-workflows)
 - [Observability Stack](#observability-stack)
 - [Troubleshooting](#troubleshooting)
@@ -36,11 +40,13 @@ auto-instrumented for traces).
 │   │                                                           │     │
 │   │   ┌──────────────────┐    ┌──────────────────────────┐   │     │
 │   │   │  NGINX Ingress   │───▶│  frontend-svc (Next.js)  │   │     │
-│   │   │  Controller      │    │   :3000, 2 replicas      │   │     │
+│   │   │  Controller      │ /  │   :3000, 2 replicas      │   │     │
 │   │   └──────────────────┘    └──────────────────────────┘   │     │
-│   │           │                                                │     │
-│   │           │  /api/auth/*                                   │     │
-│   │           ▼                                                │     │
+│   │                                  │                       │     │
+│   │                                  │  server-side fetch    │     │
+│   │                                  │  (cluster DNS, never  │     │
+│   │                                  │   via ingress)        │     │
+│   │                                  ▼                       │     │
 │   │   ┌──────────────────┐    ┌──────────────────────────┐   │     │
 │   │   │ auth-service-svc │    │ profile-service-svc      │   │     │
 │   │   │   :3001, 2 repl  │    │   :3002, 2 replicas      │   │     │
@@ -70,6 +76,11 @@ auto-instrumented for traces).
        │ :8081    │         │  :8080      │                  │  port-fwd   │
        └──────────┘         └─────────────┘                  └─────────────┘
 ```
+
+**Important routing detail:** the NGINX Ingress serves **only** `/` to the
+frontend. The `/api/auth/*` and `/api/profile/*` paths are **never** routed by
+the ingress — the Next.js server fetches them server-side over cluster DNS
+(`*.default.svc.cluster.local`). The browser only ever talks to the frontend.
 
 ---
 
@@ -122,8 +133,12 @@ make test
 make deploy-obs
 ```
 
-> `make up` assumes `make setup` was already run on the cluster. Skipping
-> `setup` will fail because the ingress namespace and ArgoCD don't exist yet.
+> **Before step 1**, update `repoURL` in both
+> `infrastructure/argocd/root-application.yaml` and
+> `infrastructure/argocd/observability-application.yaml` to point at your fork.
+> Each ArgoCD Application has its own `repoURL`, so skipping this in step 5
+> causes `make deploy-obs` to fail with a "repository not found" error from
+> ArgoCD.
 
 Open **http://localhost:8081** in your browser. You should see the
 *Kube Sandbox Dashboard* with both services reporting `online`.
@@ -252,26 +267,36 @@ all targets.
 
 ## How the Pieces Fit Together
 
+### Ingress routing
+
 The single NGINX Ingress at `/` serves the frontend. The frontend talks to
 backends over **cluster DNS** — `auth-service-svc.default.svc.cluster.local:3001`
 and `profile-service-svc.default.svc.cluster.local:3002` — injected via the
 `AUTH_SERVICE_URL` and `PROFILE_SERVICE_URL` env vars in `frontend.yaml`.
-The same image works anywhere; routing is purely declarative.
+The same image works anywhere; routing is purely declarative. The ingress
+itself never sees traffic to the backends.
 
-**ArgoCD** watches `infrastructure/` in Git and reconciles the cluster to match.
+### ArgoCD sync
+
+ArgoCD watches `infrastructure/` in Git and reconciles the cluster to match.
 A `git push` is picked up in ~3 minutes (or force-sync with `make argo-sync`).
 No `kubectl apply` is needed for manifest edits.
 
-> **Heads-up:** `repoURL` in `infrastructure/argocd/root-application.yaml` is
-> hardcoded to `https://github.com/minhajul/kube-sandbox.git` — point it at
-> your fork before the first sync.
+> **Heads-up:** `repoURL` in `infrastructure/argocd/root-application.yaml` and
+> `observability-application.yaml` is hardcoded to
+> `https://github.com/minhajul/kube-sandbox.git` — point **both** at your fork
+> before the first sync, otherwise ArgoCD will fail to clone the repo.
 
-**Health probes.** Backends probe `GET /health`; the frontend probes `GET /`
-on port 3000. K8s only routes traffic to *ready* pods, so a broken container
-is automatically removed from the service until it recovers — the dashboard
-reflects this in near-real time.
+### Health probes
 
-**Images use `imagePullPolicy: Never` with the `local` tag** because they're
+Backends probe `GET /health`; the frontend probes `GET /` on port 3000.
+K8s only routes traffic to *ready* pods, so a broken container is automatically
+removed from the service until it recovers — the dashboard reflects this in
+near-real time.
+
+### Image build model
+
+Images use `imagePullPolicy: Never` with the `local` tag because they're
 built directly into Docker Desktop's shared daemon
 (`docker build -t auth-service:local ./backend/auth-service`). No registry, no
 TLS certs, no `insecure-registries` config needed.
