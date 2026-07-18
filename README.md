@@ -17,10 +17,10 @@ auto-instrumented for traces).
 - [Repository Layout](#repository-layout)
 - [The Makefile](#the-makefile)
 - [How the Pieces Fit Together](#how-the-pieces-fit-together)
-  - [Ingress routing](#ingress-routing)
-  - [ArgoCD sync](#argocd-sync)
-  - [Health probes](#health-probes)
-  - [Image build model](#image-build-model)
+    - [Ingress routing](#ingress-routing)
+    - [ArgoCD sync](#argocd-sync)
+    - [Health probes](#health-probes)
+    - [Image build model](#image-build-model)
 - [Daily Workflows](#daily-workflows)
 - [Observability Stack](#observability-stack)
 - [Troubleshooting](#troubleshooting)
@@ -88,13 +88,13 @@ the ingress — the Next.js server fetches them server-side over cluster DNS
 
 You only need a handful of CLI tools and a running Kubernetes cluster on your Mac.
 
-| Tool           | Why                                    | Install                                                  |
-| -------------- | -------------------------------------- | -------------------------------------------------------- |
-| **Docker Desktop** | Runs the K8s cluster + builds images   | [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/) — enable *Settings → Kubernetes* |
-| **kubectl**    | Cluster interaction                    | `brew install kubectl`                                   |
-| **Helm**       | Used in the install/verify helpers     | `brew install helm`                                      |
-| **curl**       | Smoke tests                            | preinstalled                                             |
-| **make**       | Drives the build/deploy workflow       | `xcode-select --install`                                 |
+| Tool               | Why                                  | Install                                                                                                                |
+|--------------------|--------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| **Docker Desktop** | Runs the K8s cluster + builds images | [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/) — enable *Settings → Kubernetes* |
+| **kubectl**        | Cluster interaction                  | `brew install kubectl`                                                                                                 |
+| **Helm**           | Used in the install/verify helpers   | `brew install helm`                                                                                                    |
+| **curl**           | Smoke tests                          | preinstalled                                                                                                           |
+| **make**           | Drives the build/deploy workflow     | `xcode-select --install`                                                                                               |
 
 Verify everything is in place:
 
@@ -208,60 +208,60 @@ all targets.
 
 ### Bootstrap
 
-| Target           | Purpose                                              |
-| ---------------- | ---------------------------------------------------- |
-| `make setup`     | One-time: installs NGINX Ingress + ArgoCD           |
-| `make check-deps`| Verifies `docker`, `kubectl`, `helm`, `curl`         |
-| `make ingress-up` / `ingress-down` | Install/uninstall NGINX Ingress        |
-| `make argocd-up` / `argocd-down`   | Install/uninstall ArgoCD (v2.9.5)       |
+| Target                             | Purpose                                      |
+|------------------------------------|----------------------------------------------|
+| `make setup`                       | One-time: installs NGINX Ingress + ArgoCD    |
+| `make check-deps`                  | Verifies `docker`, `kubectl`, `helm`, `curl` |
+| `make ingress-up` / `ingress-down` | Install/uninstall NGINX Ingress              |
+| `make argocd-up` / `argocd-down`   | Install/uninstall ArgoCD (v2.9.5)            |
 
 ### Build / Deploy
 
-| Target           | Purpose                                              |
-| ---------------- | ---------------------------------------------------- |
-| `make build`     | Build all 3 images into the local Docker daemon     |
-| `make rebuild`   | Build with `--no-cache`                              |
-| `make deploy`    | `kubectl apply` all manifests + ArgoCD app           |
-| `make up`        | `build` + `deploy`                                   |
-| `make dev`       | `deploy` only (skip rebuild)                         |
+| Target         | Purpose                                         |
+|----------------|-------------------------------------------------|
+| `make build`   | Build all 3 images into the local Docker daemon |
+| `make rebuild` | Build with `--no-cache`                         |
+| `make deploy`  | `kubectl apply` all manifests + ArgoCD app      |
+| `make up`      | `build` + `deploy`                              |
+| `make dev`     | `deploy` only (skip rebuild)                    |
 
 ### Status / Logs
 
 | Target             | Purpose                                            |
-| ------------------ | -------------------------------------------------- |
-| `make status`      | Deployments, pods, services, ingress (all-in-one) |
+|--------------------|----------------------------------------------------|
+| `make status`      | Deployments, pods, services, ingress (all-in-one)  |
 | `make pods`        | Just the pods                                      |
-| `make logs`        | Tail logs from all 3 deployments                  |
-| `make restart`     | Rolling-restart all 3 deployments                 |
+| `make logs`        | Tail logs from all 3 deployments                   |
+| `make restart`     | Rolling-restart all 3 deployments                  |
 | `make argo-status` | ArgoCD sync + health status (one line)             |
 | `make argo-sync`   | Force ArgoCD to re-sync from Git                   |
 | `make argo-ui`     | Port-forward ArgoCD UI to `https://localhost:8080` |
 
 ### Test
 
-| Target             | Purpose                                              |
-| ------------------ | ---------------------------------------------------- |
-| `make port-forward`| Expose ingress on `localhost:8081`                   |
-| `make test`        | Smoke-test `/api/auth/health`, `/api/profile/health`, `/` |
-| `make health`      | Direct port-forward to each backend, no ingress      |
+| Target              | Purpose                                                   |
+|---------------------|-----------------------------------------------------------|
+| `make port-forward` | Expose ingress on `localhost:8081`                        |
+| `make test`         | Smoke-test `/api/auth/health`, `/api/profile/health`, `/` |
+| `make health`       | Direct port-forward to each backend, no ingress           |
 
 ### Observability
 
-| Target                | Purpose                                            |
-| --------------------- | -------------------------------------------------- |
-| `make deploy-obs`     | Install Prometheus, Grafana, Loki, OTel, RustFS   |
-| `make grafana`        | Grafana on `http://localhost:3003` (admin/admin)   |
-| `make prometheus`     | Prometheus on `http://localhost:9090`              |
-| `make rustfs`         | RustFS console on `http://localhost:9001`          |
-| `make obs-status`     | Pod status of the observability namespace          |
+| Target            | Purpose                                          |
+|-------------------|--------------------------------------------------|
+| `make deploy-obs` | Install Prometheus, Grafana, Loki, OTel, RustFS  |
+| `make grafana`    | Grafana on `http://localhost:3003` (admin/admin) |
+| `make prometheus` | Prometheus on `http://localhost:9090`            |
+| `make rustfs`     | RustFS console on `http://localhost:9001`        |
+| `make obs-status` | Pod status of the observability namespace        |
 
 ### Cleanup
 
-| Target           | Purpose                                              |
-| ---------------- | ---------------------------------------------------- |
-| `make clean`     | Delete app manifests + ArgoCD app                   |
-| `make clean-obs` | Delete observability manifests + namespace           |
-| `make nuke`      | Everything above + remove ingress + remove ArgoCD   |
+| Target           | Purpose                                           |
+|------------------|---------------------------------------------------|
+| `make clean`     | Delete app manifests + ArgoCD app                 |
+| `make clean-obs` | Delete observability manifests + namespace        |
+| `make nuke`      | Everything above + remove ingress + remove ArgoCD |
 
 ---
 
@@ -344,12 +344,12 @@ make deploy-obs
 make obs-status          # wait for all pods Running
 ```
 
-| Service       | URL (after port-forward)             | Credentials          |
-| ------------- | ------------------------------------ | -------------------- |
-| Grafana       | `http://localhost:3003`              | `admin` / `admin`    |
-| Prometheus    | `http://localhost:9090`              | —                    |
-| RustFS console| `http://localhost:9001`              | `admin` / `admin123456` |
-| ArgoCD UI     | `https://localhost:8080`             | `admin` / (see below)|
+| Service        | URL (after port-forward) | Credentials             |
+|----------------|--------------------------|-------------------------|
+| Grafana        | `http://localhost:3003`  | `admin` / `admin`       |
+| Prometheus     | `http://localhost:9090`  | —                       |
+| RustFS console | `http://localhost:9001`  | `admin` / `admin123456` |
+| ArgoCD UI      | `https://localhost:8080` | `admin` / (see below)   |
 
 For ArgoCD's initial admin password:
 
@@ -425,7 +425,7 @@ outside Docker Desktop / kubectl context is touched.
 ## Limitations & Notes
 
 - **Single-node cluster.** Docker Desktop runs a one-node K8s cluster — replicas
-  >1 are useful for rolling-update testing only.
+  > 1 are useful for rolling-update testing only.
 - **ArgoCD `repoURL` is hardcoded.** Update both
   `infrastructure/argocd/*.yaml` files to point at your fork.
 - **RustFS is included but not wired to the apps.** It's there for you to
