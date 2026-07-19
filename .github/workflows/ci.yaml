@@ -1,0 +1,161 @@
+# ============================================================================
+# kube-sandbox — CI workflow (build & push images to GHCR)
+# ----------------------------------------------------------------------------
+# Triggers:
+#   - pull_request: lint + build images (do NOT push) so PRs are validated fast
+#   - push to main: lint + build + push images to ghcr.io/<owner>/<service>
+#
+# Why two jobs:
+#   - `lint`  — cheap checks (helm/kubeconform) run on every PR
+#   - `build` — only on push to main; gated on lint passing
+#
+# Image promotion (the "CD" half) lives in `promote.yaml` and is added later.
+# This file only proves the registry/auth wiring works end-to-end.
+# ============================================================================
+
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel an in-flight run when a new commit lands on the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Default least-privilege; jobs escalate via their own `permissions:` block.
+permissions: {}
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1. Lint job — cheap, runs on every PR and every push to main
+  # --------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v4.2.1   # match the version used locally (see IMPLEMENTATION.md)
+
+      - name: Setup kubeconform
+        uses: docker://ghcr.io/yannh/kubeconform:latest
+        with:
+          args: -version
+
+      # Phases 1–2 of IMPLEMENTATION.md replace `infrastructure/*.yaml` with
+      # `infrastructure/charts/kube-sandbox/`. Until that file exists, this
+      # step is a no-op; the moment the chart is created, this condition
+      # auto-flips to `true` and the lint starts running.
+      - name: Helm lint (auto-activates when Chart.yaml exists)
+        if: hashFiles('infrastructure/charts/kube-sandbox/Chart.yaml') != ''
+        run: |
+          helm lint infrastructure/charts/kube-sandbox
+
+      - name: kubeconform on raw manifests (sanity check, always-on)
+        run: |
+          # Validates schema only — not policy. Stays fast and survives future
+          # transitions to Helm-rendered output.
+          kubeconform -strict -summary \
+            -ignore-missing-schemas \
+            infrastructure/*.yaml \
+            infrastructure/argocd/*.yaml
+
+  # --------------------------------------------------------------------------
+  # 2. Build job — matrix over the 3 services, push only on push-to-main
+  # --------------------------------------------------------------------------
+  build:
+    name: Build & push (${{ matrix.service }})
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # `packages: write` is the only elevated permission in this file.
+    # Without it, `docker push` to ghcr.io fails with 403.
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: auth-service
+            context: backend/auth-service
+            dockerfile: backend/auth-service/Dockerfile
+          - service: profile-service
+            context: backend/profile-service
+            dockerfile: backend/profile-service/Dockerfile
+          - service: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login only on push-to-main. PRs build but never push (see `push:` below
+      # being conditional on `github.event_name == 'push'`).
+      - name: Login to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # Built-in token — no secret needed for public repos. For private
+          # repos, this still works, but package visibility defaults to private
+          # and you must grant read access per consumer.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.service }}
+          # Push short-sha + latest on main; PRs get a sha-only ephemeral tag
+          # that metadata-action never pushes (because `push:` below is false).
+          tags: |
+            type=sha,format=short
+            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
+          labels: |
+            org.opencontainers.image.title=kube-sandbox-${{ matrix.service }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Build (and push on main)
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          # On PRs: build only (load into runner, never push).
+          # On main: build + push to GHCR.
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Cache per-service so frontend cache doesn't hit auth-service.
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+          # Single-arch only for now; add `platforms:` for multi-arch later.
+          platforms: linux/amd64
+          # Quiet — full SBOM/provenance lives in GHCR UI, not in logs.
+          provenance: false
+          sbom: false
