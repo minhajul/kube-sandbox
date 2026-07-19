@@ -1,0 +1,22 @@
+# Service-level Docker ignore — works for all three Dockerfiles.
+# Keeps node_modules, .git, etc., out of the build context.
+# Speeds up `docker build` and trims GHA cache size.
+
+**/node_modules
+**/.next
+**/dist
+**/build
+
+.git
+.github
+.vscode
+.idea
+.DS_Store
+
+*.log
+.env
+.env.local
+.env.*.local
+
+# Don't ship the chart to the image build context
+**/infrastructure

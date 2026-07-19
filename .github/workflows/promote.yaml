@@ -1,0 +1,150 @@
+# ============================================================================
+# kube-sandbox — promote workflow (bump image tags → open PR → ArgoCD rolls)
+# ----------------------------------------------------------------------------
+# This is the "CD" half of the pipeline. Triggered after ci.yaml succeeds
+# on main. It pulls the image tags that ci.yaml just pushed to GHCR, then
+# updates `apps.<svc>.image.tag` in `infrastructure/charts/kube-sandbox/values.yaml`
+# and opens a pull request. Merge the PR → ArgoCD reconciles → cluster rolls.
+#
+# Why a PR and not a direct push:
+#   - Reviewable (you can see the tag bump + any drift in values.yaml)
+#   - Branch protection can require approvals
+#   - The merge is the audit event ("who approved prod rollouts")
+#
+# Why `workflow_run` instead of `workflow_call`:
+#   - workflow_run fires AFTER ci.yaml completes — natural pipeline ordering
+#   - workflow_call would require ci.yaml to opt-in via `uses:`, which adds
+#     a coupling you don't want for "every push to main eventually rolls"
+# ============================================================================
+
+name: promote
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+# Cancel in-flight promote runs from the same CI run (e.g., retry).
+concurrency:
+  group: promote-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+# Default least-privilege; jobs escalate via their own `permissions:` block.
+permissions: {}
+
+jobs:
+  promote:
+    # Only run when:
+    # 1) ci.yaml concluded successfully
+    # 2) the run was on main
+    # 3) the run was a push (PRs build but don't push, so promoting from PR
+    #    would attempt to point at a tag that doesn't exist in GHCR)
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      # `packages: read` lets us verify the tag actually exists in GHCR
+      # before we claim it in values.yaml.
+      packages: read
+
+    steps:
+      - name: Checkout promote branch
+        uses: actions/checkout@v4
+        with:
+          # We need a real branch so create-pull-request can push to it.
+          ref: main
+          fetch-depth: 0
+
+      - name: Install yq
+        uses: mikefarah/yq@v4.40.5
+        with:
+          cmd: --version
+
+      - name: Compute and verify image tags
+        id: tags
+        env:
+          REGISTRY: ghcr.io
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          # ci.yaml pushes three images on push-to-main, tagged with the
+          # short commit SHA via docker/metadata-action's `type=sha,format=short`.
+          # The promotion target is that same SHA — no extra metadata needed.
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          SHORT="${SHA:0:7}"
+
+          # Defensive check: confirm the image actually exists in GHCR
+          # before we claim it in values.yaml. A successful ci.yaml doesn't
+          # *guarantee* a GHCR push — registry outages happen.
+          for svc in auth-service profile-service frontend; do
+            echo "→ checking ${REGISTRY}/${OWNER}/${svc}:${SHORT}"
+            if ! gh api \
+              -H "Accept: application/vnd.github+json" \
+              "/orgs/${OWNER}/packages/container/${svc}/versions" \
+              --jq ".[] | select(.metadata.container.tags[]? == \"${SHORT}\") | .id" \
+              | grep -q .; then
+              echo "::error::Image ${REGISTRY}/${OWNER}/${svc}:${SHORT} not found in GHCR. Aborting."
+              exit 1
+            fi
+          done
+
+          echo "✓ All three images confirmed in GHCR at sha=${SHORT}"
+
+          {
+            echo "auth=${SHORT}"
+            echo "profile=${SHORT}"
+            echo "frontend=${SHORT}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Update values.yaml with new tags
+        env:
+          SHA: ${{ steps.tags.outputs.auth }}
+        run: |
+          yq -i '.apps.auth.image.tag = strenv(SHA)' infrastructure/charts/kube-sandbox/values.yaml
+          yq -i '.apps.profile.image.tag = strenv(SHA)' infrastructure/charts/kube-sandbox/values.yaml
+          yq -i '.apps.frontend.image.tag = strenv(SHA)' infrastructure/charts/kube-sandbox/values.yaml
+
+          echo "--- new image tag summary ---"
+          yq '.apps | with_entries(.value |= .image)' infrastructure/charts/kube-sandbox/values.yaml
+
+      - name: Validate chart still renders
+        run: |
+          # Don't ship a broken chart. This catches typos in image tag formats
+          # and any accidental delete of a top-level key.
+          helm template apps infrastructure/charts/kube-sandbox --namespace default \
+            | docker run --rm -i ghcr.io/yannh/kubeconform:latest \
+                -strict -summary -ignore-missing-schemas -
+          echo "✓ Chart renders cleanly"
+
+      - name: Open promote PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: promote/${{ github.event.workflow_run.head_sha }}
+          base: main
+          title: "promote: image tags to ${{ steps.tags.outputs.auth }}"
+          # A human-readable diff is what reviewers need.
+          body: |
+            ## Image promotion
+
+            Updates `apps.<svc>.image.tag` in `infrastructure/charts/kube-sandbox/values.yaml`
+            to the short SHA built by [ci.yaml #${{ github.event.workflow_run.id }}](../../actions/runs/${{ github.event.workflow_run.id }}).
+
+            | App | New tag |
+            | --- | --- |
+            | auth     | `${{ steps.tags.outputs.auth }}` |
+            | profile  | `${{ steps.tags.outputs.profile }}` |
+            | frontend | `${{ steps.tags.outputs.frontend }}` |
+
+            Merging this PR triggers ArgoCD to sync the cluster to the new images.
+
+            - [ ] Reviewed
+            - [ ] Tested (optional: `helm template apps infrastructure/charts/kube-sandbox`)
+          add-paths: |
+            infrastructure/charts/kube-sandbox/values.yaml
+          commit-message: "promote: image tags to ${{ steps.tags.outputs.auth }}"
+          # Keep the PR open even after pushes (re-running promote bumps SHA)
+          delete-branch: true
