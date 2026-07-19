@@ -92,17 +92,28 @@ argocd-down: ## Uninstall ArgoCD
 # ----------------------------------------------------------------------------
 # ArgoCD repository credentials
 # ----------------------------------------------------------------------------
-# The repo-server needs creds to clone private repos. Without a labelled
-# Secret, ArgoCD tries anonymous clone → "authentication required".
+# ArgoCD v2.9.5 has NO `spec.source.repoCredsSecretRef` field on Application —
+# credentials live as labelled Secrets in the `argocd` namespace, and the
+# repo-server matches them to spec.source.repoURL of each Application.
 #
-# Either target creates a Secret named `argocd-repo-creds` in the `argocd`
-# namespace with the right `argocd.argoproj.io/secret-type=repository`
-# label so ArgoCD picks it up automatically.
-.PHONY: argocd-creds-ssh argocd-creds-https argocd-creds-show
+# Secret shape required by ArgoCD v2.9.5:
+#   - namespace: argocd
+#   - label: argocd.argoproj.io/secret-type: repository
+#   - stringData keys: type=git, url=<exact repo URL>,
+#                      sshPrivateKey=...  (SSH)
+#                      username + password (HTTPS)
+#
+# ArgoCD's matching rule: the Secret's `url` must be an exact match against
+# the Application's repoURL (for `secret-type: repository`).
+.PHONY: argocd-creds-ssh argocd-creds-https argocd-creds-show argocd-creds-rm
 
 ARGO_REPO_SECRET := argocd-repo-creds
+ARGO_REPO_URL    := https://github.com/$(GHCR_ORG)/$(notdir $(CURDIR)).git
 
-argocd-creds-ssh: ## Provision ArgoCD creds via SSH key (recommended)
+argocd-creds-rm: ## Delete the ArgoCD repo-credentials Secret
+	-kubectl delete secret -n $(ARGO_NAMESPACE) $(ARGO_REPO_SECRET)
+
+argocd-creds-ssh: ## Provision ArgoCD creds via SSH key (recommended for local dev)
 	@if [ ! -f "$$HOME/.ssh/argocd-deploy" ]; then \
 		echo "→ Generating new deploy key at ~/.ssh/argocd-deploy"; \
 		ssh-keygen -t ed25519 -f "$$HOME/.ssh/argocd-deploy" -N "" -C "argocd@kube-sandbox"; \
@@ -113,29 +124,33 @@ argocd-creds-ssh: ## Provision ArgoCD creds via SSH key (recommended)
 	@echo ""
 	@cat "$$HOME/.ssh/argocd-deploy.pub"
 	@echo ""
-	@read -p "Press enter once you've added the deploy key... "
+	@read -p "Press enter once the deploy key is added... "
 	@kubectl -n $(ARGO_NAMESPACE) create secret generic $(ARGO_REPO_SECRET) \
-		--from-file=sshPrivateKey="$$HOME/.ssh/argocd-deploy" \
-		--dry-run=client -o yaml | \
-		kubectl label --local -f - argocd.argoproj.io/secret-type=repository -o yaml | \
-		kubectl apply -f -
-	@echo "✓ Secret $(ARGO_REPO_SECRET) installed."
+		--from-literal=type=git \
+		--from-literal=url=$(ARGO_REPO_URL) \
+		--from-file=sshPrivateKey=$$HOME/.ssh/argocd-deploy \
+		--dry-run=client -o yaml \
+		| kubectl label --local -f - argocd.argoproj.io/secret-type=repository -o yaml \
+		| kubectl apply -f -
+	@echo "✓ Secret $(ARGO_REPO_SECRET) provisioned (ssh, url=$(ARGO_REPO_URL))"
 
-argocd-creds-https: ## Provision ArgoCD creds via classic PAT (with `repo` scope)
+argocd-creds-https: ## Provision ArgoCD creds via classic PAT (must have `repo` scope)
 	@read -p "GitHub username [$(GHCR_ORG)]: " USR; \
 	USR=$${USR:-$(GHCR_ORG)}; \
 	read -s -p "Classic PAT (must have `repo` scope): " PAT; echo; \
 	kubectl -n $(ARGO_NAMESPACE) create secret generic $(ARGO_REPO_SECRET) \
+		--from-literal=type=git \
+		--from-literal=url=$(ARGO_REPO_URL) \
 		--from-literal=username=$$USR \
 		--from-literal=password=$$PAT \
-		--dry-run=client -o yaml | \
-		kubectl label --local -f - argocd.argoproj.io/secret-type=repository -o yaml | \
-		kubectl apply -f -
-	@echo "✓ Secret $(ARGO_REPO_SECRET) installed."
+		--dry-run=client -o yaml \
+		| kubectl label --local -f - argocd.argoproj.io/secret-type=repository -o yaml \
+		| kubectl apply -f -
+	@echo "✓ Secret $(ARGO_REPO_SECRET) provisioned (https, url=$(ARGO_REPO_URL))"
 
 argocd-creds-show: ## Show the current ArgoCD repo credentials Secret (metadata only)
 	@kubectl -n $(ARGO_NAMESPACE) get secret $(ARGO_REPO_SECRET) -o yaml \
-		| grep -vE '^\s+(sshPrivateKey|password):' \
+		| sed -E '/^\s*(sshPrivateKey|password):/ d' \
 		| head -20
 
 # ---- Build ------------------------------------------------------------------
