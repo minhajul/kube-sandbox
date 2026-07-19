@@ -29,10 +29,6 @@ build: ## Build all Docker images locally
 	docker build -t profile-service:$(TAG) backend/profile-service
 	docker build -t frontend:$(TAG)        frontend
 
-.PHONY: tilt
-tilt: ## Run Tilt for hot-reloading development in K8s
-	tilt up
-
 .PHONY: push-ghcr
 push-ghcr: build ## Build and push images to GHCR with tag $(GHCR_TAG)
 	docker login $(GHCR_REGISTRY) -u $(GHCR_ORG)
