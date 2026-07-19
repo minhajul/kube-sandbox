@@ -4,8 +4,8 @@ description: GitOps microservices sandbox — auth, profile, frontend
 type: application
 version: 0.1.0
 # Fallback image tag when apps.<svc>.image.tag is empty.
-# `promote.yaml` overwrites this with the real git SHA on every push to main.
-# Keep it as a sentinel ("0.0.0") so accidentally-empty tags are visible.
+# `promote.yaml` overwrites this with the real git SHA on every push to the main.
+# Keep it as a sentinel ("0.0.0") so accidentally empty tags are visible.
 appVersion: "0.0.0"
 keywords:
   - gitops

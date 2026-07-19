@@ -74,7 +74,7 @@ apps:
       limits:   { cpu: 500m, memory: 512Mi }
     env:
       NODE_ENV: production
-      # Service URLs are rendered from a helper so DNS names stay consistent
+      # Service URLs are rendered from a helper, so DNS names stay consistent
       # with whatever the chart's fullname helper produces.
       # (See templates/_helpers.tpl `sandbox.serviceURL`.)
       AUTH_SERVICE_URL: ""

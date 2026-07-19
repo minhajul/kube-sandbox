@@ -15,11 +15,11 @@ spec:
     path: infrastructure/charts/kube-sandbox
     # NOTE: ArgoCD v2.9.5's Application CRD has NO `spec.source.repoCredsSecretRef`
     # field. Credentials are NOT a per-Application thing in this version —
-    # they live as labelled Secrets in the `argocd` namespace, and the
+    # they live as labeled Secrets in the `argocd` namespace, and the
     # repo-server matches them to the repoURL prefix automatically.
     # Provision via:
-    #   make argocd-creds-ssh     SSH key (recommended for local dev)
-    #   make argocd-creds-https   Classic PAT (fallback)
+    #   make argocd-creds-ssh SSH key (recommended for local dev)
+    #   make argocd-creds-https Classic PAT (fallback)
     helm:
       # `releaseName` matches what `helm template apps` would produce.
       # ArgoCD renders with these values inline; you can also split values
