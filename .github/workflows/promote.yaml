@@ -78,23 +78,29 @@ jobs:
         env:
           REGISTRY: ghcr.io
           OWNER: ${{ github.repository_owner }}
+          # GITHUB_TOKEN is automatically provided by Actions to every step.
+          # We use it directly with curl because `gh api` requires GH_TOKEN
+          # (different env var) and adds no value over curl for this query.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # ci.yaml pushes three images on push-to-main, tagged with the
           # short commit SHA via docker/metadata-action's `type=sha,format=short`.
-          # The promotion target is that same SHA — no extra metadata needed.
           SHA="${{ github.event.workflow_run.head_sha }}"
           SHORT="${SHA:0:7}"
 
-          # Defensive check: confirm the image actually exists in GHCR
-          # before we claim it in values.yaml. A successful ci.yaml doesn't
-          # *guarantee* a GHCR push — registry outages happen.
+          # Defensive check: confirm the image actually exists in GHCR before
+          # we claim it in values.yaml. Uses GHCR's REST API. The path prefix
+          # depends on whether the owner is a user or an organization.
+          # The action repo (minhajul/kube-sandbox) belongs to a *user* account,
+          # so we use /users/{user}/packages. This is the most common bug here.
           for svc in auth-service profile-service frontend; do
             echo "→ checking ${REGISTRY}/${OWNER}/${svc}:${SHORT}"
-            if ! gh api \
+            if ! curl -sSf \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
-              "/orgs/${OWNER}/packages/container/${svc}/versions" \
-              --jq ".[] | select(.metadata.container.tags[]? == \"${SHORT}\") | .id" \
-              | grep -q .; then
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/users/${OWNER}/packages/container/${svc}/versions" \
+              | grep -q "\"${SHORT}\""; then
               echo "::error::Image ${REGISTRY}/${OWNER}/${svc}:${SHORT} not found in GHCR. Aborting."
               exit 1
             fi
