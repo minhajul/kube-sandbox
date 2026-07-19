@@ -137,31 +137,10 @@ jobs:
                 -strict -summary -ignore-missing-schemas -
           echo "✓ Chart renders cleanly"
 
-      - name: Open promote PR
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: promote/${{ github.event.workflow_run.head_sha }}
-          base: main
-          title: "promote: image tags to ${{ steps.tags.outputs.auth }}"
-          # A human-readable diff is what reviewers need.
-          body: |
-            ## Image promotion
-
-            Updates `apps.<svc>.image.tag` in `infrastructure/charts/kube-sandbox/values.yaml`
-            to the short SHA built by [ci.yaml #${{ github.event.workflow_run.id }}](../../actions/runs/${{ github.event.workflow_run.id }}).
-
-            | App | New tag |
-            | --- | --- |
-            | auth     | `${{ steps.tags.outputs.auth }}` |
-            | profile  | `${{ steps.tags.outputs.profile }}` |
-            | frontend | `${{ steps.tags.outputs.frontend }}` |
-
-            Merging this PR triggers ArgoCD to sync the cluster to the new images.
-
-            - [ ] Reviewed
-            - [ ] Tested (optional: `helm template apps infrastructure/charts/kube-sandbox`)
-          add-paths: |
-            infrastructure/charts/kube-sandbox/values.yaml
-          commit-message: "promote: image tags to ${{ steps.tags.outputs.auth }}"
-          # Keep the PR open even after pushes (re-running promote bumps SHA)
-          delete-branch: true
+      - name: Commit and push changes directly to main
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add infrastructure/charts/kube-sandbox/values.yaml
+          git commit -m "promote: bump image tags to ${{ steps.tags.outputs.auth }} [skip ci]" || exit 0
+          git push origin main
