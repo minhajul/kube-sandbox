@@ -139,7 +139,7 @@ jobs:
           # PRs build but never push (gated by `push:` below), so the
           # `latest` tag would only ever reach GHCR from a real merge.
           tags: |
-            type=sha,format=short
+            type=sha,format=short,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=kube-sandbox-${{ matrix.service }}
