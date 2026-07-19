@@ -1,0 +1,14 @@
+kube-sandbox {{ .Chart.AppVersion }} has been deployed as "{{ .Release.Name }}".
+
+Apps:
+{{- range $name, $app := .Values.apps }}
+{{- if $app.enabled }}
+  - {{ $name | upper }}: {{ $app.port }}{{ if $app.image.tag }}  (image tag: {{ $app.image.tag }}){{ end }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+
+Ingress enabled. Make sure /etc/hosts (or your DNS) points to your ingress IP,
+or use `kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8081:80`.
+{{- end }}

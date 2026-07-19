@@ -15,11 +15,18 @@
 BACKEND_DIR     := backend
 FRONTEND_DIR    := frontend
 INFRA_DIR       := infrastructure
+CHART_DIR       := $(INFRA_DIR)/charts/kube-sandbox
 ARGOCD_FILE     := $(INFRA_DIR)/argocd/root-application.yaml
 TAG             := local
 APP_NAMESPACE   := default
 ARGO_NAMESPACE  := argocd
 INGRESS_PF_PORT := 8081
+
+# GHCR config — defaults to your git remote's owner segment. Override on the
+# command line: `make push-ghcr GHCR_ORG=my-user`.
+GHCR_REGISTRY   := ghcr.io
+GHCR_ORG        ?= $(shell git remote get-url origin | sed -E 's|.*[:/]([^/]+)/.*|\1|')
+GHCR_TAG        ?= 0.0.0
 
 ARGOCD_VERSION  := v2.9.5
 ARGOCD_MANIFEST := https://raw.githubusercontent.com/argoproj/argo-cd/$(ARGOCD_VERSION)/manifests/install.yaml
@@ -52,9 +59,13 @@ check-deps: ## Verify required CLI tools
 ingress-up: ## Install NGINX Ingress Controller
 	@echo "→ Installing NGINX Ingress Controller"
 	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
-	@kubectl wait --namespace ingress-nginx \
-		--for=condition=ready pod \
-		--selector=app.kubernetes.io/component=controller \
+	# Wait on the Deployment's Available condition instead of the pod directly.
+	# `kubectl wait --selector=...` exits non-zero when 0 pods match, which
+	# races with pod scheduling right after `kubectl apply`. Waiting on the
+	# Deployment polls until the rollout reports Available, which inherently
+	# means at least one pod is ready.
+	kubectl wait --namespace ingress-nginx \
+		--for=condition=Available deployment/ingress-nginx-controller \
 		--timeout=180s
 	@echo "✓ Ingress controller ready"
 
@@ -65,10 +76,14 @@ argocd-up: ## Install ArgoCD (v2.9.5)
 	@kubectl get namespace $(ARGO_NAMESPACE) >/dev/null 2>&1 || kubectl create namespace $(ARGO_NAMESPACE)
 	@echo "→ Installing ArgoCD $(ARGOCD_VERSION)"
 	kubectl apply -n $(ARGO_NAMESPACE) --server-side --force-conflicts -f $(ARGOCD_MANIFEST)
-	@kubectl wait --namespace $(ARGO_NAMESPACE) \
-		--for=condition=ready pod \
-		--selector=app.kubernetes.io/name=argocd-server \
-		--timeout=240s
+	# Wait on all Deployments in the namespace to be Available. ArgoCD has
+	# many components (server, repo-server, application-controller, …) and
+	# the old `--selector=app.kubernetes.io/name=argocd-server` race-failed
+	# the same way as ingress-up when pods weren't scheduled yet.
+	kubectl wait --namespace $(ARGO_NAMESPACE) \
+		--for=condition=Available \
+		--all deployments \
+		--timeout=300s
 	@echo "✓ ArgoCD $(ARGOCD_VERSION) installed"
 
 argocd-down: ## Uninstall ArgoCD
@@ -87,19 +102,59 @@ rebuild: ## Rebuild all images (no cache)
 	docker build --no-cache -t profile-service:$(TAG) $(BACKEND_DIR)/profile-service
 	docker build --no-cache -t frontend:$(TAG)        $(FRONTEND_DIR)
 
-# ---- Deploy -----------------------------------------------------------------
-.PHONY: deploy
+# ----------------------------------------------------------------------------
+# GHCR bootstrap — one-time, run BEFORE first ArgoCD sync of the chart
+# ----------------------------------------------------------------------------
+# The chart defaults to image tag "0.0.0". Push a real image with that tag
+# so ArgoCD can pull it. After this, `promote.yaml` takes over and bumps
+# `apps.<svc>.image.tag` in values.yaml to the git SHA on every push.
+.PHONY: push-ghcr ghcr-login
 
-deploy: ## Apply all Kubernetes manifests
-	kubectl apply -f $(INFRA_DIR)/ -n $(APP_NAMESPACE)
-	kubectl apply -f $(ARGOCD_FILE) -n $(ARGO_NAMESPACE)
+ghcr-login: ## Log in to GHCR (uses docker creds; needs `read:packages` scope)
+	@echo "→ Logging into $(GHCR_REGISTRY) as $(GHCR_ORG)"
+	docker login $(GHCR_REGISTRY) -u $(GHCR_ORG)
+
+push-ghcr: build ghcr-login ## Build local images + push to GHCR with tag $(GHCR_TAG)
+	@echo "→ Pushing images to $(GHCR_REGISTRY)/$(GHCR_ORG)/<svc>:$(GHCR_TAG)"
+	docker tag auth-service:$(TAG)    $(GHCR_REGISTRY)/$(GHCR_ORG)/auth-service:$(GHCR_TAG)
+	docker tag profile-service:$(TAG) $(GHCR_REGISTRY)/$(GHCR_ORG)/profile-service:$(GHCR_TAG)
+	docker tag frontend:$(TAG)        $(GHCR_REGISTRY)/$(GHCR_ORG)/frontend:$(GHCR_TAG)
+	docker push $(GHCR_REGISTRY)/$(GHCR_ORG)/auth-service:$(GHCR_TAG)
+	docker push $(GHCR_REGISTRY)/$(GHCR_ORG)/profile-service:$(GHCR_TAG)
+	docker push $(GHCR_REGISTRY)/$(GHCR_ORG)/frontend:$(GHCR_TAG)
+	@echo "✓ All images pushed. ArgoCD will now be able to pull them."
+
+# ---- Deploy -----------------------------------------------------------------
+# The cluster no longer has raw YAML. All reconciliation happens through
+# ArgoCD watching the Helm chart. `deploy` re-applies the ArgoCD Application
+# (which ArgoCD already owns — this is just a re-bootstrap if it's missing).
+.PHONY: deploy sync
+
+deploy: ## (Re)apply ArgoCD Application so ArgoCD reconciles the chart
+	kubectl apply -n $(ARGO_NAMESPACE) -f $(ARGOCD_FILE)
+	@echo "✓ ArgoCD will reconcile infrastructure/charts/kube-sandbox → cluster"
+
+sync: ## Force ArgoCD to re-sync NOW (don't wait for its polling)
+	kubectl -n $(ARGO_NAMESPACE) patch application root-application --type merge \
+		-p '{"operation":{"initiatedBy":{"username":"local"},"sync":{"revision":"HEAD"}}}'
+
+# ---- Render (verify what ArgoCD will apply) ---------------------------------
+.PHONY: render diff-render
+
+render: ## Render the chart locally — what ArgoCD sees, without applying
+	helm template apps $(CHART_DIR) --namespace $(APP_NAMESPACE)
 
 # ---- Rollout ----------------------------------------------------------------
+# Deployment names include the Helm release prefix. The chart uses
+# fullname "<release>-kube-sandbox-<app>" so auth-service's deployment is
+# "apps-kube-sandbox-auth" (kebab-cased, prefixed with release=apps).
+HELM_RELEASE ?= apps-kube-sandbox
+
 .PHONY: restart
 
-restart: ## Rolling-restart all deployments
-	@for svc in $(SERVICES); do \
-		kubectl rollout restart deployment/$$svc -n $(APP_NAMESPACE); \
+restart: ## Rolling-restart all deployments via Helm-generated names
+	@for svc in auth profile frontend; do \
+		kubectl rollout restart deployment/$(HELM_RELEASE)-$$svc -n $(APP_NAMESPACE); \
 	done
 
 # ---- Status / Logs ----------------------------------------------------------

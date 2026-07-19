@@ -60,22 +60,16 @@ jobs:
         with:
           args: -version
 
-      # Phases 1–2 of IMPLEMENTATION.md replace `infrastructure/*.yaml` with
-      # `infrastructure/charts/kube-sandbox/`. Until that file exists, this
-      # step is a no-op; the moment the chart is created, this condition
-      # auto-flips to `true` and the lint starts running.
-      - name: Helm lint (auto-activates when Chart.yaml exists)
-        if: hashFiles('infrastructure/charts/kube-sandbox/Chart.yaml') != ''
+      - name: Helm lint + render + kubeconform
         run: |
-          helm lint infrastructure/charts/kube-sandbox
+          # Render the chart to stdout, pipe to kubeconform via stdin.
+          # This catches schema bugs before they hit the cluster.
+          helm template apps infrastructure/charts/kube-sandbox \
+            --namespace default \
+            | kubeconform -strict -summary -ignore-missing-schemas -
 
-      - name: kubeconform on raw manifests (sanity check, always-on)
-        run: |
-          # Validates schema only — not policy. Stays fast and survives future
-          # transitions to Helm-rendered output.
-          kubeconform -strict -summary \
-            -ignore-missing-schemas \
-            infrastructure/*.yaml \
+          # Also validate the ArgoCD Application manifests directly.
+          kubeconform -strict -summary -ignore-missing-schemas \
             infrastructure/argocd/*.yaml
 
   # --------------------------------------------------------------------------

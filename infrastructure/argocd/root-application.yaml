@@ -11,10 +11,13 @@ spec:
     # Update this to point at your actual Git repo
     repoURL: https://github.com/minhajul/kube-sandbox.git
     targetRevision: HEAD
-    path: infrastructure
-    directory:
-      recurse: false
-      include: '{*.yaml,*.yml}'
+    # Watch the Helm chart, not raw YAML. Chart.yaml must exist at this path.
+    path: infrastructure/charts/kube-sandbox
+    helm:
+      # `releaseName` matches what `helm template apps` would produce.
+      # ArgoCD renders with these values inline; you can also split values
+      # into a `values.yaml`-style block here if you want env overlays.
+      releaseName: apps
   destination:
     server: https://kubernetes.default.svc
     namespace: default
@@ -25,6 +28,10 @@ spec:
       allowEmpty: false
     syncOptions:
       - CreateNamespace=true
+      # ServerSideApply is mandatory once CRDs grow past the 256 KB annotation limit.
+      # Safe to enable today; it changes how kubectl/ArgoCD writes objects but
+      # not how objects are returned to you.
+      - ServerSideApply=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
     retry:
@@ -33,3 +40,32 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 3m
+  # Ignore controller-managed fields so ArgoCD doesn't fight itself.
+  # Without these you'll see repeated "OutOfSync" status that resolves
+  # itself on the next reconciling but pollutes dashboards.
+  # IMPORTANT: ignoreDifferences is a SIBLING of syncPolicy under spec — NOT
+  # a child. Indenting it under syncPolicy causes strict decoding to reject
+  # the whole Application as having an unknown field.
+  ignoreDifferences:
+    - group: apps/v1
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas   # HPA writes this; we don't use HPA yet but it's harmless
+        - /metadata/generation
+        - /status
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /spec/clusterIP
+        - /spec/clusterIPs
+        - /spec/ports/0/nodePort
+        - /spec/ipFamilies
+        - /spec/ipFamilyPolicy
+    - group: networking.k8s.io
+      kind: Ingress
+      jsonPointers:
+        - /status
+    - group: ""
+      kind: Endpoints
+      jsonPointers:
+        - /subsets

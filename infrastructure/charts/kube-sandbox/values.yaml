@@ -1,0 +1,105 @@
+# ============================================================================
+# kube-sandbox default values
+# ----------------------------------------------------------------------------
+# Per-app config lives under `apps.<name>`. Adding a new app = adding one
+# entry here + one block in templates/. No duplicated deployment yaml.
+#
+# Image promotion: `ci.yaml` builds images on push-to-main and tags them
+# with the short SHA. `promote.yaml` then bumps `apps.<name>.image.tag`
+# here and opens a PR. ArgoCD reconciles when the PR is merged.
+# ============================================================================
+
+# Default registry/org — overridden per env later (dev/staging/prod).
+registry: ghcr.io
+org: &org "minhajul"        # auto-replaced at render time via .Values.org
+
+# Replica counts, probes, resources — overridable per-app.
+defaultReplicaCount: 2
+
+# Shared pod-level settings
+podAnnotations: {}
+podSecurityContext: {}
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+# ----------------------------------------------------------------------------
+# Apps
+# ----------------------------------------------------------------------------
+# Each entry follows the same schema. To add a 4th app: add it here and a
+# matching `templates/<name>-deployment.yaml` etc. block at the bottom of
+# the templates directory (or convert to a loop if you have 4+ apps).
+apps:
+  auth:
+    enabled: true
+    port: 3001
+    # GHCR is the registry. Tag is overridden by `promote.yaml` at PR time.
+    image:
+      repository: auth-service
+      tag: ""          # intentionally blank — promote.yaml fills it
+      pullPolicy: IfNotPresent
+    replicaCount: 2
+    healthcheckPath: /health
+    resources:
+      requests: { cpu: 50m,  memory: 128Mi }
+      limits:   { cpu: 200m, memory: 256Mi }
+
+  profile:
+    enabled: true
+    port: 3002
+    image:
+      repository: profile-service
+      tag: ""
+      pullPolicy: IfNotPresent
+    replicaCount: 2
+    healthcheckPath: /health
+    resources:
+      requests: { cpu: 50m,  memory: 128Mi }
+      limits:   { cpu: 200m, memory: 256Mi }
+
+  frontend:
+    enabled: true
+    port: 3000
+    image:
+      repository: frontend
+      tag: ""
+      pullPolicy: IfNotPresent
+    replicaCount: 2
+    healthcheckPath: /
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+    env:
+      NODE_ENV: production
+      # Service URLs are rendered from a helper so DNS names stay consistent
+      # with whatever the chart's fullname helper produces.
+      # (See templates/_helpers.tpl `sandbox.serviceURL`.)
+      AUTH_SERVICE_URL: ""
+      PROFILE_SERVICE_URL: ""
+
+# ----------------------------------------------------------------------------
+# Ingress
+# ----------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: ""
+      paths:
+        # Phase 2: /api/auth/* → auth, /api/profile/* → profile, / → frontend
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 3000
+
+# ----------------------------------------------------------------------------
+# ServiceAccount
+# ----------------------------------------------------------------------------
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
