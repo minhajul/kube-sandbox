@@ -11,11 +11,9 @@
 
 # Default registry/org — overridden per env later (dev/staging/prod).
 registry: ghcr.io
-org: &org "minhajul"        # auto-replaced at render time via .Values.org
-
+org: &org "minhajul" # auto-replaced at render time via .Values.org
 # Replica counts, probes, resources — overridable per-app.
 defaultReplicaCount: 2
-
 # Shared pod-level settings
 podAnnotations: {}
 podSecurityContext: {}
@@ -25,7 +23,6 @@ securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop: ["ALL"]
-
 # ----------------------------------------------------------------------------
 # Apps
 # ----------------------------------------------------------------------------
@@ -39,39 +36,37 @@ apps:
     # GHCR is the registry. Tag is overridden by `promote.yaml` at PR time.
     image:
       repository: auth-service
-      tag: ""          # intentionally blank — promote.yaml fills it
+      tag: "a29daa8" # intentionally blank — promote.yaml fills it
       pullPolicy: IfNotPresent
     replicaCount: 2
     healthcheckPath: /health
     resources:
-      requests: { cpu: 50m,  memory: 128Mi }
-      limits:   { cpu: 200m, memory: 256Mi }
-
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: 200m, memory: 256Mi}
   profile:
     enabled: true
     port: 3002
     image:
       repository: profile-service
-      tag: ""
+      tag: "a29daa8"
       pullPolicy: IfNotPresent
     replicaCount: 2
     healthcheckPath: /health
     resources:
-      requests: { cpu: 50m,  memory: 128Mi }
-      limits:   { cpu: 200m, memory: 256Mi }
-
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: 200m, memory: 256Mi}
   frontend:
     enabled: true
     port: 3000
     image:
       repository: frontend
-      tag: ""
+      tag: "a29daa8"
       pullPolicy: IfNotPresent
     replicaCount: 2
     healthcheckPath: /
     resources:
-      requests: { cpu: 100m, memory: 256Mi }
-      limits:   { cpu: 500m, memory: 512Mi }
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {cpu: 500m, memory: 512Mi}
     env:
       NODE_ENV: production
       # Service URLs are rendered from a helper, so DNS names stay consistent
@@ -79,7 +74,6 @@ apps:
       # (See templates/_helpers.tpl `sandbox.serviceURL`.)
       AUTH_SERVICE_URL: ""
       PROFILE_SERVICE_URL: ""
-
 # ----------------------------------------------------------------------------
 # Ingress
 # ----------------------------------------------------------------------------
@@ -95,7 +89,6 @@ ingress:
           pathType: Prefix
           service: frontend
           port: 3000
-
 # ----------------------------------------------------------------------------
 # ServiceAccount
 # ----------------------------------------------------------------------------
