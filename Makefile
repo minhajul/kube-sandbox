@@ -63,12 +63,14 @@ argo-sync: ## Force ArgoCD to sync immediately
 # ---- Access & Port-forwarding ----
 
 .PHONY: port-forward
-port-forward: ## Expose Ingress (8081) and ArgoCD UI (8080) (Ctrl-C to stop)
+port-forward: ## Expose Ingress (8081), ArgoCD UI (8080), and Grafana (3003) (Ctrl-C to stop)
 	@echo "→ Access frontend dashboard at: http://localhost:$(INGRESS_PF_PORT)"
 	@echo "→ Access ArgoCD UI at: https://localhost:8080"
+	@echo "→ Access Grafana at: http://localhost:3003 (admin / admin)"
 	@echo "→ Retrieve admin password with: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\"{.data.password}\" | base64 -d; echo"
 	@kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller $(INGRESS_PF_PORT):80 & \
 	 kubectl port-forward svc/argocd-server -n $(ARGO_NAMESPACE) 8080:443 & \
+	 kubectl port-forward svc/grafana -n observability 3003:3000 2>/dev/null || true & \
 	 wait
 
 # ---- Verification & Logs ----
@@ -89,6 +91,24 @@ status: ## Show running pods and services
 	kubectl get pods -n $(APP_NAMESPACE) -o wide
 	kubectl get svc -n $(APP_NAMESPACE)
 
+# ---- Observability ----
+
+OBS_DIR         := infrastructure/observability
+OBS_NAMESPACE   := observability
+OBS_ARGOCD_FILE := infrastructure/argocd/observability-application.yaml
+
+.PHONY: deploy-obs
+deploy-obs: ## Deploy the observability stack (Prometheus, Grafana, Loki, OTel)
+	kubectl apply -f $(OBS_DIR)/namespace.yaml
+	kubectl apply -f $(OBS_DIR)/ -n $(OBS_NAMESPACE)
+	kubectl apply -f $(OBS_ARGOCD_FILE) -n $(ARGO_NAMESPACE)
+	@echo "✓ Observability stack deployed"
+
+.PHONY: grafana
+grafana: ## Expose Grafana on http://localhost:3003 (Ctrl-C to stop)
+	@echo "→ Access Grafana at: http://localhost:3003  (Credentials: admin / admin)"
+	kubectl port-forward -n $(OBS_NAMESPACE) svc/grafana 3003:3000
+
 # ---- Cleanup ----
 
 .PHONY: clean
@@ -96,6 +116,7 @@ clean: ## Remove deployed root app (ArgoCD will prune resource objects)
 	-kubectl delete -f infrastructure/argocd/root-application.yaml -n $(ARGO_NAMESPACE)
 
 .PHONY: nuke
-nuke: clean ## Delete Ingress and ArgoCD setups entirely
-	-kubectl delete namespace $(ARGO_NAMESPACE)
+nuke: clean ## Delete Ingress, ArgoCD, and Observability setups entirely
+	-kubectl delete -f $(OBS_ARGOCD_FILE) -n $(ARGO_NAMESPACE)
+	-kubectl delete namespace $(OBS_NAMESPACE) $(ARGO_NAMESPACE)
 	-kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
