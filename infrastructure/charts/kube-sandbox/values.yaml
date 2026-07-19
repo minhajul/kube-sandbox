@@ -62,7 +62,7 @@ apps:
       repository: frontend
       tag: "9d34298"
       pullPolicy: IfNotPresent
-    replicaCount: 3
+    replicaCount: 2
     healthcheckPath: /
     resources:
       requests: {cpu: 100m, memory: 256Mi}
