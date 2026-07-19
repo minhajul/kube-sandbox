@@ -18,6 +18,8 @@ name: Lint Build and Push
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'infrastructure/charts/kube-sandbox/values.yaml'
 
 # Cancel an in-flight run when a new commit lands on the same branch.
 concurrency:
