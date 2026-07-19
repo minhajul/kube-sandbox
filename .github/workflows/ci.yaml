@@ -55,13 +55,22 @@ jobs:
         with:
           version: v4.2.1   # match the version used locally (see IMPLEMENTATION.md)
 
-      - name: Setup kubeconform
-        uses: docker://ghcr.io/yannh/kubeconform:latest
+      - name: Install kubeconform
+        run: |
+          # Pull the kubeconform binary out of its official image instead of
+          # using `uses: docker://ghcr.io/yannh/kubeconform:latest` (which
+          # runs the image as a container action but doesn't expose the
+          # binary on PATH).
+          set -euo pipefail
+          curl -sSL "https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-$(uname -s)-$(uname -m).tar.gz" \
+            | tar xz -C /tmp
+          sudo mv /tmp/kubeconform /usr/local/bin/kubeconform
+          kubeconform -v
 
       - name: Helm lint + render + kubeconform
         run: |
           # Render the chart to stdout, pipe to kubeconform via stdin.
-          # This catches schema bugs before they hit the cluster.
+          # Catches schema bugs before they hit the cluster.
           helm template apps infrastructure/charts/kube-sandbox \
             --namespace default \
             | kubeconform -strict -summary -ignore-missing-schemas -
@@ -123,11 +132,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.service }}
-          # Push short-sha + latest on main; PRs get a sha-only ephemeral tag
-          # that metadata-action never pushes (because `push:` below is false).
+          # Push short-sha always. Add `latest` only on push-to-main.
+          # PRs build but never push (gated by `push:` below), so the
+          # `latest` tag would only ever reach GHCR from a real merge.
           tags: |
             type=sha,format=short
-            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
+            type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=kube-sandbox-${{ matrix.service }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
