@@ -56,9 +56,22 @@ jobs:
       - name: Checkout promote branch
         uses: actions/checkout@v4
         with:
-          # We need a real branch so create-pull-request can push to it.
+          # We need a real branch, so create-pull-request can push to it.
           ref: main
           fetch-depth: 0
+
+      - name: Install yq (binary)
+        # The `uses: mikefarah/yq@v4.40.5` container-action form below fails on
+        # GitHub-hosted runners because container actions do not accept a
+        # `cmd:` input (that's JS-action syntax). This step pre-installs yq
+        # on PATH so the later shell steps can call `yq` directly.
+        run: |
+          YQ_VERSION="4.40.5"
+          curl -sSL -o /tmp/yq \
+            "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64"
+          chmod +x /tmp/yq
+          sudo mv /tmp/yq /usr/local/bin/yq
+          yq --version
 
       - name: Install yq
         uses: mikefarah/yq@v4.40.5
