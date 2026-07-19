@@ -36,7 +36,7 @@ apps:
     # GHCR is the registry. Tag is overridden by `promote.yaml` at PR time.
     image:
       repository: auth-service
-      tag: "ac05ad8" # intentionally blank — promote.yaml fills it
+      tag: "5fb335f" # intentionally blank — promote.yaml fills it
       pullPolicy: IfNotPresent
     replicaCount: 2
     healthcheckPath: /health
@@ -48,7 +48,7 @@ apps:
     port: 3002
     image:
       repository: profile-service
-      tag: "ac05ad8"
+      tag: "5fb335f"
       pullPolicy: IfNotPresent
     replicaCount: 2
     healthcheckPath: /health
@@ -60,7 +60,7 @@ apps:
     port: 3000
     image:
       repository: frontend
-      tag: "ac05ad8"
+      tag: "5fb335f"
       pullPolicy: IfNotPresent
     replicaCount: 2
     healthcheckPath: /
