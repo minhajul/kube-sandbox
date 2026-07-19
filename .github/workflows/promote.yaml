@@ -21,7 +21,7 @@ name: promote
 
 on:
   workflow_run:
-    workflows: ["ci"]
+    workflows: ["Lint Build and Push"]
     types: [completed]
 
 # Cancel in-flight promote runs from the same CI run (e.g., retry).
