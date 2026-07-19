@@ -17,7 +17,7 @@
 #     a coupling you don't want for "every push to main eventually rolls"
 # ============================================================================
 
-name: promote
+name: Promote
 
 on:
   workflow_run:
@@ -78,7 +78,7 @@ jobs:
         env:
           REGISTRY: ghcr.io
           OWNER: ${{ github.repository_owner }}
-          # GITHUB_TOKEN is automatically provided by Actions to every step.
+          # Actions automatically provide GITHUB_TOKEN to every step.
           # We use it directly with curl because `gh api` requires GH_TOKEN
           # (different env var) and adds no value over curl for this query.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
