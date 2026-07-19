@@ -13,6 +13,21 @@ spec:
     targetRevision: HEAD
     # Watch the Helm chart, not raw YAML. Chart.yaml must exist at this path.
     path: infrastructure/charts/kube-sandbox
+    # `repoCredsSecretRef` points at a Secret in the argocd namespace
+    # labelled `argocd.argoproj.io/secret-type=repository`. Without this,
+    # ArgoCD tries to clone anonymously and fails with "authentication
+    # required" on private repos.
+    #
+    # Provision it with one of:
+    #   make argocd-creds-ssh  SSH key (recommended for local dev)
+    #   make argocd-creds-https Classic PAT (fallback)
+    # Both targets create the same Secret name: `argocd-repo-creds`.
+    repoCredsSecretRef:
+      # When secret-name is set to "" ArgoCD falls back to anonymous
+      # clone — which works for public repos but fails for kube-sandbox
+      # (it's private). The "" here is a placeholder; the bootstrap step
+      # below sets the actual reference via `make deploy`.
+      secret: argocd-repo-creds
     helm:
       # `releaseName` matches what `helm template apps` would produce.
       # ArgoCD renders with these values inline; you can also split values

@@ -89,6 +89,55 @@ argocd-up: ## Install ArgoCD (v2.9.5)
 argocd-down: ## Uninstall ArgoCD
 	-kubectl delete -n $(ARGO_NAMESPACE) -f $(ARGOCD_MANIFEST) --ignore-not-found
 
+# ----------------------------------------------------------------------------
+# ArgoCD repository credentials
+# ----------------------------------------------------------------------------
+# The repo-server needs creds to clone private repos. Without a labelled
+# Secret, ArgoCD tries anonymous clone → "authentication required".
+#
+# Either target creates a Secret named `argocd-repo-creds` in the `argocd`
+# namespace with the right `argocd.argoproj.io/secret-type=repository`
+# label so ArgoCD picks it up automatically.
+.PHONY: argocd-creds-ssh argocd-creds-https argocd-creds-show
+
+ARGO_REPO_SECRET := argocd-repo-creds
+
+argocd-creds-ssh: ## Provision ArgoCD creds via SSH key (recommended)
+	@if [ ! -f "$$HOME/.ssh/argocd-deploy" ]; then \
+		echo "→ Generating new deploy key at ~/.ssh/argocd-deploy"; \
+		ssh-keygen -t ed25519 -f "$$HOME/.ssh/argocd-deploy" -N "" -C "argocd@kube-sandbox"; \
+	fi
+	@echo ""
+	@echo "→ Add this PUBLIC key as a read-only deploy key on the repo:"
+	@echo "   https://github.com/$(GHCR_ORG)/$(notdir $(CURDIR))/settings/keys/new"
+	@echo ""
+	@cat "$$HOME/.ssh/argocd-deploy.pub"
+	@echo ""
+	@read -p "Press enter once you've added the deploy key... "
+	@kubectl -n $(ARGO_NAMESPACE) create secret generic $(ARGO_REPO_SECRET) \
+		--from-file=sshPrivateKey="$$HOME/.ssh/argocd-deploy" \
+		--dry-run=client -o yaml | \
+		kubectl label --local -f - argocd.argoproj.io/secret-type=repository -o yaml | \
+		kubectl apply -f -
+	@echo "✓ Secret $(ARGO_REPO_SECRET) installed."
+
+argocd-creds-https: ## Provision ArgoCD creds via classic PAT (with `repo` scope)
+	@read -p "GitHub username [$(GHCR_ORG)]: " USR; \
+	USR=$${USR:-$(GHCR_ORG)}; \
+	read -s -p "Classic PAT (must have `repo` scope): " PAT; echo; \
+	kubectl -n $(ARGO_NAMESPACE) create secret generic $(ARGO_REPO_SECRET) \
+		--from-literal=username=$$USR \
+		--from-literal=password=$$PAT \
+		--dry-run=client -o yaml | \
+		kubectl label --local -f - argocd.argoproj.io/secret-type=repository -o yaml | \
+		kubectl apply -f -
+	@echo "✓ Secret $(ARGO_REPO_SECRET) installed."
+
+argocd-creds-show: ## Show the current ArgoCD repo credentials Secret (metadata only)
+	@kubectl -n $(ARGO_NAMESPACE) get secret $(ARGO_REPO_SECRET) -o yaml \
+		| grep -vE '^\s+(sshPrivateKey|password):' \
+		| head -20
+
 # ---- Build ------------------------------------------------------------------
 .PHONY: build rebuild
 
