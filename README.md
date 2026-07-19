@@ -120,16 +120,16 @@ To scale your applications (e.g. update replicas):
 
 ## Commands Reference
 
-| Target | D escripti              on                                                   |
-|---|------------------------------------------------------------------------------|
-| -----------------------ke setu p` | Installs         Ingress Controller and ArgoCD.                              |
-| `make depl oy` | Deploys t       he root ArgoCD application.                                  |
-| `make argo -sync` | Forces Ar    goCD to sync immediately from Git.                              |
-| `make port -forward` | Exposes t he Frontend Ingress (8081) and ArgoCD UI (8080) concurrently.      |
-| `make buil d` | Builds al        l Docker images locally.                                    |
-| `make push -ghcr` | Builds lo    cal images and pushes them to GHCR with tag `0.0.0`.            |
-| `make test ` | Smoke-tes         ts the backend and frontend routes.                        |
-| `make logs ` | Tails log         s from frontend and backend components.                    |
-| `make stat us` | Checks ru       nning pods and services in the cluster.                      |
-| `make clea n` | Deletes t        he deployed application manifests.                          |
-| `make nuke ` | Deletes t         he entire setup (including Ingress and ArgoCD namespaces). |
+| Target               | Description                                                   |
+|----------------------|----------------------------------------------------------------------------|
+| `make setu p`        | Installs         Ingress Controller and ArgoCD.                            |
+| `make depl oy`       | Deploys t       he root ArgoCD application.                                |
+| `make argo -sync`    | Forces Ar    goCD to sync immediately from Git.                            |
+| `make port -forward` | Exposes t he Frontend Ingress (8081) and ArgoCD UI (8080) concurrently.    |
+| `make buil d`        | Builds al        l Docker images locally.                                  |
+| `make push -ghcr`    | Builds lo    cal images and pushes them to GHCR with tag `0.0.0`.          |
+| `make test `         | Smoke-tes         ts the backend and frontend routes.                      |
+| `make logs `         | Tails log         s from frontend and backend components.                  |
+| `make stat us`       | Checks ru       nning pods and services in the cluster.                    |
+| `make clea n`        | Deletes t        he deployed application manifests.                        |
+| `make nuke `         | Deletes t         he entire setup (including Ingress and ArgoCD namespaces). |
