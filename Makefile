@@ -114,6 +114,7 @@ grafana: ## Expose Grafana on http://localhost:3003 (Ctrl-C to stop)
 .PHONY: clean
 clean: ## Remove deployed root app (ArgoCD will prune resource objects)
 	-kubectl delete -f infrastructure/argocd/root-application.yaml -n $(ARGO_NAMESPACE)
+	-kubectl delete deployments,services,ingress,serviceaccounts -n $(APP_NAMESPACE) -l app.kubernetes.io/part-of=kube-sandbox
 
 .PHONY: nuke
 nuke: clean ## Delete Ingress, ArgoCD, and Observability setups entirely
