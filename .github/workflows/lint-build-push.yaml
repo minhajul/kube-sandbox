@@ -17,7 +17,7 @@ name: Lint Build and Push
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
     paths-ignore:
       - 'infrastructure/charts/kube-sandbox/values.yaml'
 
@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 # Default least-privilege; jobs escalate via their own `permissions:` block.
-permissions: {}
+permissions: { }
 
 env:
   REGISTRY: ghcr.io
@@ -136,7 +136,7 @@ jobs:
   # --------------------------------------------------------------------------
   build:
     name: Build & push (${{ matrix.service }})
-    needs: [lint, lint-code]
+    needs: [ lint, lint-code ]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # `packages: write` is the only elevated permission in this file.

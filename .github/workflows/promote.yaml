@@ -21,8 +21,8 @@ name: Promote
 
 on:
   workflow_run:
-    workflows: ["Lint Build and Push"]
-    types: [completed]
+    workflows: [ "Lint Build and Push" ]
+    types: [ completed ]
 
 # Cancel in-flight promote runs from the same CI run (e.g., retry).
 concurrency:
@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 # Default least-privilege; jobs escalate via their own `permissions:` block.
-permissions: {}
+permissions: { }
 
 env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
