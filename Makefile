@@ -121,3 +121,7 @@ nuke: clean ## Delete Ingress, ArgoCD, and Observability setups entirely
 	-kubectl delete -f $(OBS_ARGOCD_FILE) -n $(ARGO_NAMESPACE)
 	-kubectl delete namespace $(OBS_NAMESPACE) $(ARGO_NAMESPACE)
 	-kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+.PHONY: nuke-all
+nuke-all: nuke ## nuke + remove all Docker images, containers, volumes, and build cache
+	docker system prune -af --volumes
