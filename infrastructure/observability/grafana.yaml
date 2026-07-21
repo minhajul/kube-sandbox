@@ -160,6 +160,288 @@ data:
           "targets": [
             { "expr": "{k8s_namespace_name=\"default\"}" }
           ]
+        },
+        {
+          "title": "Pod Restarts (24h)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 30 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            { "expr": "sum(increase(kube_pod_container_status_restarts_total[24h]))" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "OOMKills (24h)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 30 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            { "expr": "sum(increase(kube_pod_container_status_last_terminated_reason{reason=\"OOMKilled\"}[24h]))" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Pending Pods by Namespace",
+          "type": "timeseries",
+          "gridPos": { "h": 4, "w": 12, "x": 12, "y": 30 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_status_phase{phase=\"Pending\"}) by (namespace)",
+              "legendFormat": "{{namespace}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "CPU Requests vs Limits per Deployment",
+          "type": "bargauge",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\",namespace=\"default\"}) by (deployment)",
+              "legendFormat": "{{deployment}} (req)"
+            },
+            {
+              "expr": "sum(kube_pod_container_resource_limits{resource=\"cpu\",namespace=\"default\"}) by (deployment)",
+              "legendFormat": "{{deployment}} (lim)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Memory Requests vs Limits per Deployment",
+          "type": "bargauge",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_container_resource_requests{resource=\"memory\",namespace=\"default\"}) by (deployment)",
+              "legendFormat": "{{deployment}} (req)"
+            },
+            {
+              "expr": "sum(kube_pod_container_resource_limits{resource=\"memory\",namespace=\"default\"}) by (deployment)",
+              "legendFormat": "{{deployment}} (lim)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Filesystem Usage %",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "1 - (node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs\"})",
+              "legendFormat": "{{instance}} {{mountpoint}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "max": 1,
+              "min": 0,
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.85 }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Network RX / TX",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])",
+              "legendFormat": "{{instance}} {{device}} RX"
+            },
+            {
+              "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])",
+              "legendFormat": "{{instance}} {{device}} TX"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Load Average (1m / 5m / 15m)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 50 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "node_load1",
+              "legendFormat": "{{instance}} 1m"
+            },
+            {
+              "expr": "node_load5",
+              "legendFormat": "{{instance}} 5m"
+            },
+            {
+              "expr": "node_load15",
+              "legendFormat": "{{instance}} 15m"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Logs by Pod (default ns)",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 58 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [
+            { "expr": "{k8s_namespace_name=\"default\"}" }
+          ]
+        },
+        {
+          "title": "Errors & stderr",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 68 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [
+            { "expr": "{k8s_namespace_name=~\"default|observability\", stream=\"stderr\"}" },
+            { "expr": "{k8s_namespace_name=~\"default|observability\"} |~ \"(?i)(error|exception|fatal|panic)\"" }
+          ]
+        },
+        {
+          "title": "HTTP Request Rate (TODO: per-service)",
+          "description": "PLACEHOLDER - apps don't expose /metrics yet. To enable: add prom-client + middleware to backend/auth-service and backend/profile-service, add a browser beacon to frontend, then add `prometheus.io/scrape: 'true'` + `prometheus.io/port: '<port>'` annotations to chart deployment templates.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 78 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "TODO: sum(rate(http_requests_total{service=~\"auth-service|profile-service|frontend\"}[5m])) by (service)",
+              "legendFormat": "{{service}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "HTTP Error Rate 5xx (TODO)",
+          "description": "PLACEHOLDER - see HTTP Request Rate panel for what to wire up.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 78 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "TODO: sum(rate(http_requests_total{status=~\"5..\",service=~\"auth-service|profile-service|frontend\"}[5m])) by (service)",
+              "legendFormat": "{{service}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "HTTP Latency p95 (TODO)",
+          "description": "PLACEHOLDER - see HTTP Request Rate panel for what to wire up.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 78 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "TODO: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=~\"auth-service|profile-service|frontend\"}[5m])) by (le, service))",
+              "legendFormat": "{{service}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never" }
+            },
+            "overrides": []
+          }
         }
       ],
       "schemaVersion": 39,
