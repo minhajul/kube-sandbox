@@ -60,38 +60,6 @@ data:
       "links": [],
       "panels": [
         {
-          "title": "CPU Usage",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "" },
-          "targets": [
-            {
-              "expr": "sum(rate(node_cpu_seconds_total{mode!=\"idle\"}[5m])) by (instance)",
-              "legendFormat": "{{instance}}"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": { "unit": "percentunit" },
-            "overrides": []
-          }
-        },
-        {
-          "title": "Memory Usage",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "" },
-          "targets": [
-            {
-              "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
-              "legendFormat": "Used %"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": { "unit": "percentunit", "max": 1 },
-            "overrides": []
-          }
-        },
-        {
           "title": "Pods Running",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
@@ -130,6 +98,40 @@ data:
             "overrides": []
           }
         },
+        
+        {
+          "title": "CPU Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "sum(rate(node_cpu_seconds_total{mode!=\"idle\"}[5m])) by (instance)",
+              "legendFormat": "{{instance}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit" },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Memory Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "" },
+          "targets": [
+            {
+              "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+              "legendFormat": "Used %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit", "max": 1 },
+            "overrides": []
+          }
+        },
+        
         {
           "title": "Deployment Replica Availability",
           "type": "table",
@@ -150,15 +152,6 @@ data:
                 "renameByName": { "deployment": "Deployment", "namespace": "Namespace", "Value": "Available Replicas" }
               }
             }
-          ]
-        },
-        {
-          "title": "Pod Logs",
-          "type": "logs",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
-          "datasource": { "type": "loki", "uid": "" },
-          "targets": [
-            { "expr": "{k8s_namespace_name=\"default\"}" }
           ]
         },
         {
@@ -362,25 +355,6 @@ data:
           }
         },
         {
-          "title": "Logs by Pod (default ns)",
-          "type": "logs",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 58 },
-          "datasource": { "type": "loki", "uid": "" },
-          "targets": [
-            { "expr": "{k8s_namespace_name=\"default\"}" }
-          ]
-        },
-        {
-          "title": "Errors & stderr",
-          "type": "logs",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 68 },
-          "datasource": { "type": "loki", "uid": "" },
-          "targets": [
-            { "expr": "{k8s_namespace_name=~\"default|observability\", stream=\"stderr\"}" },
-            { "expr": "{k8s_namespace_name=~\"default|observability\"} |~ \"(?i)(error|exception|fatal|panic)\"" }
-          ]
-        },
-        {
           "title": "HTTP Request Rate (TODO: per-service)",
           "description": "PLACEHOLDER - apps don't expose /metrics yet. To enable: add prom-client + middleware to backend/auth-service and backend/profile-service, add a browser beacon to frontend, then add `prometheus.io/scrape: 'true'` + `prometheus.io/port: '<port>'` annotations to chart deployment templates.",
           "type": "timeseries",
@@ -442,6 +416,34 @@ data:
             },
             "overrides": []
           }
+        },
+        {
+          "title": "Pod Logs",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [
+            { "expr": "{k8s_namespace_name=\"default\"}" }
+          ]
+        },
+        {
+          "title": "Logs by Pod (default ns)",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 58 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [
+            { "expr": "{k8s_namespace_name=\"default\"}" }
+          ]
+        },
+        {
+          "title": "Errors & stderr",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 68 },
+          "datasource": { "type": "loki", "uid": "" },
+          "targets": [
+            { "expr": "{k8s_namespace_name=~\"default|observability\", stream=\"stderr\"}" },
+            { "expr": "{k8s_namespace_name=~\"default|observability\"} |~ \"(?i)(error|exception|fatal|panic)\"" }
+          ]
         }
       ],
       "schemaVersion": 39,
