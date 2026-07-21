@@ -25,7 +25,7 @@ apps:
       pullPolicy: IfNotPresent
     resources:
       requests: { cpu: 50m,  memory: 128Mi }
-      limits:   { cpu: 200m, memory: 256Mi }
+      limits: { cpu: 200m, memory: 256Mi }
 ```
 
 ## Image promotion
@@ -39,10 +39,10 @@ to fill it:
 
 ## Rendered service names
 
-| App | Service (cluster-internal) |
-| --- | --- |
-| auth     | `apps-kube-sandbox-auth.default.svc.cluster.local:3001` |
-| profile  | `apps-kube-sandbox-profile.default.svc.cluster.local:3002` |
+| App      | Service (cluster-internal)                                  |
+|----------|-------------------------------------------------------------|
+| auth     | `apps-kube-sandbox-auth.default.svc.cluster.local:3001`     |
+| profile  | `apps-kube-sandbox-profile.default.svc.cluster.local:3002`  |
 | frontend | `apps-kube-sandbox-frontend.default.svc.cluster.local:3000` |
 
 Format: `<release>-<chart>-<app>.<ns>.svc.cluster.local`.
