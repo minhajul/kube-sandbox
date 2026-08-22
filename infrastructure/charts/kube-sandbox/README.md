@@ -1,7 +1,7 @@
-# kube-sandbox Helm chart
+# kube Sandbox Helm Chart
 
-Renders Deployments, Services, and an Ingress for the three apps (auth,
-profile, frontend) using per-app values under `apps.<name>`.
+Renders Deployments, Services, and an Ingress for the three apps (auth, profile, frontend) using per-app values under
+`apps.<name>`.
 
 ## Install locally (without ArgoCD)
 
@@ -30,8 +30,7 @@ apps:
 
 ## Image promotion
 
-The chart's `apps.<svc>.image.tag` is intentionally **empty**. Two paths
-to fill it:
+The chart's `apps.<svc>.image.tag` is intentionally **empty**. Two paths to fill it:
 
 1. **CI (production path):** merge a PR opened by `promote.yaml`.
 2. **Local dev:** `make push-ghcr` pushes a `0.0.0` tag; manually set

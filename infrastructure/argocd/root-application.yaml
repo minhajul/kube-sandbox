@@ -36,7 +36,7 @@ spec:
     - group: apps/v1
       kind: Deployment
       jsonPointers:
-        - /spec/replicas   # HPA writes this; we don't use HPA yet but it's harmless
+        - /spec/replicas   # HPA writes this; we don't use HPA yet, but it's harmless
         - /metadata/generation
         - /status
     - group: ""
