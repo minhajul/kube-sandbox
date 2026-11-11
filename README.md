@@ -1,8 +1,8 @@
 # Kube Sandbox
 
 A **GitOps-driven microservices sandbox** built for practicing Kubernetes, CI/CD, and GitOps locally. It contains two
-NestJS backend services (`auth-service`, `profile-service`) and a Next.js frontend, deployed to local Kubernetes via *
-*ArgoCD** and fronted by the **NGINX Ingress Controller**.
+NestJS backend services (`auth-service`, `profile-service`) and a Next.js frontend, deployed to local Kubernetes via
+**ArgoCD** and fronted by the **NGINX Ingress Controller**.
 
 ---
 
