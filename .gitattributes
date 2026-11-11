@@ -1,0 +1,3 @@
+# Count Kubernetes/Helm/ArgoCD/CI YAML in GitHub's language stats
+*.yaml linguist-detectable=true
+*.yml linguist-detectable=true
